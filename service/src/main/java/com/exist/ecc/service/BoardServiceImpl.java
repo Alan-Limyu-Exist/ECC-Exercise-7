@@ -33,14 +33,11 @@ public class BoardServiceImpl implements BoardService, Loadable, Saveable  {
 
     public BoardServiceImpl() { }
 
-    public boolean search(Board board) {
+    public boolean search(Board board, String stringToSearch) {
         boolean found = false;
         List<List<Cell>> array = board.getArray();
         int rows = array.size();
         int totalOccurences = 0;
-
-        String stringToSearch = Utils.getStringInput(
-            "Enter character to search: ");
 
         for (int currentRow = 0; currentRow < rows; currentRow++) {
             int currentCol = 0;
@@ -88,11 +85,7 @@ public class BoardServiceImpl implements BoardService, Loadable, Saveable  {
             .anyMatch(cell -> cell.getKey().equals(key)));
     }
 
-    public void edit(Board board) {
-        String keyToEdit;
-
-        keyToEdit = Utils.getStringInput("Enter cell key to edit: ");
-
+    public void edit(Board board, String keyToEdit) {
         boolean invalidInput;
         String[] keyAndValue;
 
@@ -145,24 +138,7 @@ public class BoardServiceImpl implements BoardService, Loadable, Saveable  {
         }
     }
 
-    public void reset(Board board) {
-        int rows;
-        int cols;
-
-        System.out.print("Enter number of rows: ");
-        rows = Utils.getUnsignedIntInput("Invalid row value, please input a number greater than 0");
-
-        if (rows == -1) {
-            return;
-        }
-
-        System.out.print("Enter number of columns: ");
-        cols = Utils.getUnsignedIntInput("Invalid column value, please input a number greater than 0");
-
-        if (cols == -1) {
-            return;
-        }
-
+    public void reset(Board board, int rows, int cols) {
         board.setArray(new ArrayList<>());
 
         for (int currentRow = 0; currentRow < rows; currentRow++) {
@@ -215,18 +191,7 @@ public class BoardServiceImpl implements BoardService, Loadable, Saveable  {
         return value;
     }
 
-    public void sortRow(Board board) {
-        int rows = board.getArray().size();
-        int row = 0;
-
-        System.out.print("Enter row to sort: ");
-        row = Utils.getUnsignedIntInput("Invalid row, please input a number from 0 - " + (rows - 1));
-
-        if (row >= rows) {
-            System.out.println("Invalid row, please input a number from 0 - " + (rows - 1));
-            return;
-        }
-
+    public void sortRow(Board board, int row) {
         Collections.sort(board.getArray().get(row), new CellComparator());
     }
 
