@@ -6,7 +6,7 @@ import com.exist.ecc.service.BoardServiceImpl;
 import com.exist.ecc.util.Utils;
 
 
-public class Exercise5 {
+public class Exercise7 {
     private static final String DEFAULT_BOARD = "DefaultBoard.txt";
 
     public static void main(String[] args) {
