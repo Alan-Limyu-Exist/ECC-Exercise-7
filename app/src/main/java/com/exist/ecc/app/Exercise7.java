@@ -37,60 +37,17 @@ public class Exercise7 {
             }
 
             switch (option) {
-                case 1 -> {
-                    String stringToSearch = Utils.getStringInput(
-                        "Enter character to search: ");
-                    if (!boardService.search(board, stringToSearch)) {
-                        System.out.println("Value not found!");
-                    }
-                }
-                case 2 -> {
-                    String keyToEdit = Utils.getStringInput("Enter cell key to edit: ");
-                    boardService.edit(board, keyToEdit);
-                }
-                case 3 -> {
-                    boardService.print(board);
-                }
-                case 4 -> {
-                    System.out.print("Enter number of rows: ");
-                    int rows = Utils.getUnsignedIntInput("Invalid row value, please input a number greater than 0");
-
-                    if (rows == -1) {
-                        continue;
-                    }
-
-                    System.out.print("Enter number of columns: ");
-                    int cols = Utils.getUnsignedIntInput("Invalid column value, please input a number greater than 0");
-
-                    if (cols == -1) {
-                        continue;
-                    }
-
-                    boardService.reset(board, rows, cols);
-                }
-                case 5 -> {
-                    boardService.addRow(board);
-                }
-                case 6 -> {
-                    int rows = board.getArray().size();
-
-                    System.out.print("Enter row to sort: ");
-                    int row = Utils.getUnsignedIntInput("Invalid row, please input a number from 0 - " + (rows - 1));
-
-                    if (row >= rows) {
-                        System.out.println("Invalid row, please input a number from 0 - " + (rows - 1));
-                        return;
-                    }
-
-                    boardService.sortRow(board, row);
-                }
+                case 1 -> handleSearch(board, boardService);
+                case 2 -> handleEdit(board, boardService);
+                case 3 -> boardService.print(board);
+                case 4 -> handleReset(board, boardService);
+                case 5 -> boardService.addRow(board);
+                case 6 -> handleSort(board, boardService);
                 case 7 -> {
                     System.out.println("Exiting...");
                     exit = true;
                 }
-                default  -> {
-                    System.out.println("Invalid choice! Please try again");
-                }
+                default -> System.out.println("Invalid choice! Please try again");
             }
 
             System.out.println();
@@ -98,6 +55,48 @@ public class Exercise7 {
         }
 
         Utils.SCANNER.close();
+    }
+
+    private static void handleSearch(Board board, BoardService boardService) {
+        String searchValue = Utils.getStringInput("Enter character to search: ");
+        if (!boardService.search(board, searchValue)) {
+            System.out.println("Value not found!");
+        }
+    }
+
+    private static void handleEdit(Board board, BoardService boardService) {
+        String keyToEdit = Utils.getStringInput("Enter cell key to edit: ");
+        boardService.edit(board, keyToEdit);
+    }
+
+    private static void handleReset(Board board, BoardService boardService) {
+        System.out.print("Enter number of rows: ");
+        int rows = Utils.getUnsignedIntInput("Invalid row value, please input a number greater than 0");
+
+        if (rows == -1) {
+            return;
+        }
+
+        System.out.print("Enter number of columns: ");
+        int cols = Utils.getUnsignedIntInput("Invalid column value, please input a number greater than 0");
+
+        if (cols == -1) {
+            return;
+        }
+
+        boardService.reset(board, rows, cols);
+    }
+
+    private static void handleSort(Board board, BoardService boardService) {
+        int rows = board.getArray().size();
+        System.out.print("Enter row to sort: ");
+        int row = Utils.getUnsignedIntInput("Invalid row, please input a number from 0 - " + (rows - 1));
+        
+        if (row >= rows) {
+            System.out.println("Invalid row, please input a number from 0 - " + (rows - 1));
+            return;
+        }
+        boardService.sortRow(board, row);
     }
 
     private static void printMenu() {
