@@ -2,7 +2,9 @@ import com.exist.ecc.util.Utils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -27,43 +29,34 @@ public class UtilsTest {
         System.setOut(new PrintStream(outputStreamCaptor));
     }
 
-    @Test
-    public void testValidGetUnsignedInput() throws java.io.IOException{
-        String validHighestInput = String.valueOf(Integer.MAX_VALUE);
-        String validLowestInput = 0 + "\n";
-        String invalidMessage = "Error message for invalid input";
+    @Nested
+    class TestGetUnsignedIntInput {
+        @ParameterizedTest
+        @ValueSource(strings = {"0", "1", "5", "100", "1000", "123456"})
+        public void testValidInput(String input) throws java.io.IOException{
+            String invalidMessage = "Error message for invalid input";
 
-        resetScanner(new ByteArrayInputStream(validHighestInput.getBytes()));
+            resetScanner(new ByteArrayInputStream(input.getBytes()));
 
-        assertEquals(Integer.MAX_VALUE, Utils.getUnsignedIntInput(invalidMessage), "The input should be valid");
-        assertEquals("", outputStreamCaptor.toString().trim(), "No error message should be printed");
+            assertEquals(Integer.parseInt(input), Utils.getUnsignedIntInput(invalidMessage), "The input should be valid");
+            assertEquals("", outputStreamCaptor.toString().trim(), "No error message should be printed");
+        }
 
-        resetScanner(new ByteArrayInputStream(validLowestInput.getBytes()));
+        @ParameterizedTest
+        @ValueSource(strings = {"-1", "-10", "-124", "-1000", "-123456"})
+        public void testInvalidInput(String input) {
+            String invalidMessage = "Error message for invalid input";
 
-        assertEquals(0, Utils.getUnsignedIntInput(invalidMessage), "The input should be valid");
-        assertEquals("", outputStreamCaptor.toString().trim(), "No error message should be printed");
+            resetScanner(new ByteArrayInputStream(input.getBytes()));
+
+            assertEquals(-1, Utils.getUnsignedIntInput(invalidMessage), "The input should be invalid");
+            assertEquals(invalidMessage, outputStreamCaptor.toString().trim(), "Error message should be printed");
+        }
     }
 
-    @Test
-    public void testInvalidGetUnsignedInput() {
-        String invalidHighestInput = -1 + "\n";
-        String invalidLowestInput = Integer.MIN_VALUE + "\n";
-        String invalidMessage = "Error message for invalid input";
-
-        resetScanner(new ByteArrayInputStream(invalidHighestInput.getBytes()));
-
-        assertEquals(-1, Utils.getUnsignedIntInput(invalidMessage), "The input should be invalid");
-        assertEquals(invalidMessage, outputStreamCaptor.toString().trim(), "Error message should be printed");
-
-        resetScanner(new ByteArrayInputStream(invalidLowestInput.getBytes()));
-
-        assertEquals(-1, Utils.getUnsignedIntInput(invalidMessage), "The input should be invalid");
-        assertEquals(invalidMessage, outputStreamCaptor.toString().trim(), "Error message should be printed");
-    }
-
-    @Test
-    public void testGetStringInput() {
-        String input = "Test Input";
+    @ParameterizedTest
+    @ValueSource(strings = {"Test Input", "1", "0", "-1", " "})
+    public void testGetStringInput(String input) {
         String message = "Enter a string: ";
 
         resetScanner(new ByteArrayInputStream(input.getBytes()));
