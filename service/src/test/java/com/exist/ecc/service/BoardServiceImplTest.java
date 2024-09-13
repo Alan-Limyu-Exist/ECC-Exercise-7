@@ -3,7 +3,10 @@ import com.exist.ecc.model.Cell;
 import com.exist.ecc.util.Utils;
 import com.exist.ecc.service.BoardServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -45,41 +48,23 @@ public class BoardServiceImplTest {
         System.setOut(new PrintStream(outputStreamCaptor));
     }
 
-    @Test
-    public void testSearchFound() {
-        assertTrue(boardService.search(board, "key1"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
+    @Nested
+    class TestSearch {
+        @ParameterizedTest
+        @ValueSource(strings = {"key1", "k", "1", "value2", "v", "2", "key4", "value4", "4"})
+        public void testFound(String stringToSearch) {
+            assertTrue(boardService.search(board, stringToSearch));
+            assertTrue(outputStreamCaptor.toString().contains("Value found"));
+            assertBoardValuesUnchanged();
+        }
 
-        assertTrue(boardService.search(board, "k"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "1"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "value2"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "v"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "2"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "key4"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "value4"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-        assertTrue(boardService.search(board, "4"), "The search should find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Value found"), "Should print the found position.");
-
-    }
-
-    @Test
-    public void testSearchNotFound() {
-        assertFalse(boardService.search(board, "key5"), "The search should not find the string");
-        assertTrue(outputStreamCaptor.toString().contains("Total occurences: 0"), "Should not print found message.");
+        @ParameterizedTest
+        @ValueSource(strings = {"key5", "x", "key 1", "value5", "value 2"})
+        public void testNotFound(String stringToSearch) {
+            assertFalse(boardService.search(board, stringToSearch), "The search should not find the string");
+            assertTrue(outputStreamCaptor.toString().contains("Total occurences: 0"), "Should not print found message.");
+            assertBoardValuesUnchanged();
+        }
     }
 
     @Test
@@ -88,79 +73,66 @@ public class BoardServiceImplTest {
         assertTrue(outputStreamCaptor.toString().contains("[key1 value1] [key2 value2]")
             && outputStreamCaptor.toString().contains("[key3 value3] [key4 value4]"),
             "Should print the correct board contents.");
+        assertBoardValuesUnchanged();
     }
 
-    @Test
-    public void testContainsKey() {
-        assertTrue(boardService.containsKey(board, "key1"), "The board should contain the key");
-        assertTrue(boardService.containsKey(board, "key2"), "The board should not contain the key");
-        assertTrue(boardService.containsKey(board, "key3"), "The board should not contain the key");
-        assertTrue(boardService.containsKey(board, "key4"), "The board should not contain the key");
+    @Nested
+    class TestContainsKey {
+        @ParameterizedTest
+        @ValueSource(strings = {"key1", "key2", "key3", "key4"})
+        public void testKeyFound(String key) {
+            assertTrue(boardService.containsKey(board, key));
+            assertBoardValuesUnchanged();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"x", "k", "e", "y", "1", "key"})
+        public void testKeyNotFound(String key) {
+            assertFalse(boardService.containsKey(board, key));
+            assertBoardValuesUnchanged();
+        }
     }
 
-    @Test
-    public void testDoesNotContainKey() {
-        assertFalse(boardService.containsKey(board, "x"), "The board should not contain the key");
-        assertFalse(boardService.containsKey(board, "k"), "The board should not contain the key");
-        assertFalse(boardService.containsKey(board, "e"), "The board should not contain the key");
-        assertFalse(boardService.containsKey(board, "y"), "The board should not contain the key");
-        assertFalse(boardService.containsKey(board, "1"), "The board should not contain the key");
-    }
+    @Nested
+    class TestEdit {
+        @Test
+        public void testValidKey() {
+            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey1 newValue1\n".getBytes()));
+            boardService.edit(board, "key1");
 
-    @Test
-    public void testEditValidKey() {
-        Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey1 newValue1\n".getBytes()));
-        boardService.edit(board, "key1");
+            Cell editedCell = board.getArray().get(0).get(0);
+            assertEquals("newKey1", editedCell.getKey(), "The key should be updated");
+            assertEquals("newValue1", editedCell.getValue(), "The value should be updated");
 
-        Cell editedCell = board.getArray().get(0).get(0);
-        assertEquals("newKey1", editedCell.getKey(), "The key should be updated");
-        assertEquals("newValue1", editedCell.getValue(), "The value should be updated");
+            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey4 newValue4\n".getBytes()));
+            boardService.edit(board, "key4");
 
-        Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey4 newValue4\n".getBytes()));
-        boardService.edit(board, "key4");
+            editedCell = board.getArray().get(1).get(1);
+            assertEquals("newKey4", editedCell.getKey(), "The key should be updated");
+            assertEquals("newValue4", editedCell.getValue(), "The value should be updated");
 
-        editedCell = board.getArray().get(1).get(1);
-        assertEquals("newKey4", editedCell.getKey(), "The key should be updated");
-        assertEquals("newValue4", editedCell.getValue(), "The value should be updated");
+            editedCell = board.getArray().get(1).get(0);
+            assertEquals("key3", editedCell.getKey(), "The key should not be updated");
+            assertEquals("value3", editedCell.getValue(), "The value should not be updated");
 
-        editedCell = board.getArray().get(1).get(0);
-        assertEquals("key3", editedCell.getKey(), "The key should not be updated");
-        assertEquals("value3", editedCell.getValue(), "The value should not be updated");
+            editedCell = board.getArray().get(0).get(1);
+            assertEquals("key2", editedCell.getKey(), "The key should not be updated");
+            assertEquals("value2", editedCell.getValue(), "The value should not be updated");
 
-        editedCell = board.getArray().get(0).get(1);
-        assertEquals("key2", editedCell.getKey(), "The key should not be updated");
-        assertEquals("value2", editedCell.getValue(), "The value should not be updated");
+            assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
+            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
+        }
 
-        assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
-    }
+        @ParameterizedTest
+        @ValueSource(strings = {"x", "k", "e", "y", "1", "key"})
+        public void testInvalidKey(String key) {
+            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey newValue\n".getBytes()));
+            boardService.edit(board, key);
 
-    @Test
-    public void testEditInvalidKey() {
-        Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey newValue\n".getBytes()));
-        boardService.edit(board, "x");
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
-
-        boardService.edit(board, "key");
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
-        assertTrue(outputStreamCaptor.toString().contains("Key does not exist"), "Should not print found message.");
-
-        assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
+            assertBoardValuesUnchanged();
+            assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
+            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
+        }
     }
 
     @Test
@@ -185,100 +157,71 @@ public class BoardServiceImplTest {
     @Test
     public void testAddRow() {
         boardService.addRow(board);
-        assertEquals(3, board.getArray().size(), "The board should have 2 rows after adding a row");
+        assertEquals(3, board.getArray().size(), "The board should have 3 rows after adding a row");
 
         boardService.addRow(board);
-        assertEquals(4, board.getArray().size(), "The board should have 2 rows after adding a row");
+        assertEquals(4, board.getArray().size(), "The board should have 4 rows after adding a row");
 
         boardService.addRow(board);
-        assertEquals(5, board.getArray().size(), "The board should have 2 rows after adding a row");
+        assertEquals(5, board.getArray().size(), "The board should have 5 rows after adding a row");
 
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
-
+        assertBoardValuesUnchanged();
         assertEquals(5, board.getArray().size(), "The board should have 5 rows after adding");
         assertEquals(2, board.getArray().get(4).size(), "Each row should have 3 columns after adding");
     }
 
-    @Test
-    public void testSortRow() {
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell("b", "valueB"));
-        row.add(new Cell("a", "valueA"));
-        board.getArray().add(row);
+    @Nested
+    class TestSort {
+        @Test
+        public void testUnsortedRow() {
+            List<Cell> row = new ArrayList<>();
+            row.add(new Cell("b", "valueB"));
+            row.add(new Cell("a", "valueA"));
+            board.getArray().add(row);
 
-        boardService.sortRow(board, 2);
-        assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
-        assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
-        assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
-        assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
-        
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
+            boardService.sortRow(board, 2);
+            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
+            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
+            assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
+            assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
+            
+            assertBoardValuesUnchanged();
+            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
+            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+        }
 
-        assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
-    }
+        @Test
+        public void testSortedRow() {
+            List<Cell> row = new ArrayList<>();
+            row.add(new Cell("a", "valueA"));
+            row.add(new Cell("b", "valueB"));
+            board.getArray().add(row);
 
-    @Test
-    public void testSortRowThatsAlreadySorted() {
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell("a", "valueA"));
-        row.add(new Cell("b", "valueB"));
-        board.getArray().add(row);
+            boardService.sortRow(board, 0);
+            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
+            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
+            assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
+            assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
 
-        boardService.sortRow(board, 0);
-        assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
-        assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
-        assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
-        assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
+            assertBoardValuesUnchanged();
+            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
+            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+        }
 
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
+        @Test
+        public void testRowWithSingleElement() {
+            List<Cell> row = new ArrayList<>();
+            row.add(new Cell("a", "valueA"));
+            board.getArray().add(row);
 
-        assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
-    }
+            boardService.sortRow(board, 2);
+            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The single element's key should still be 'a'.");
+            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The single element should have the value 'valueA'.");
 
-    @Test
-    public void testSortRowWithSingleElement() {
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell("a", "valueA"));
-        board.getArray().add(row);
-
-        boardService.sortRow(board, 2);
-        assertEquals("a", board.getArray().get(2).get(0).getKey(), "The single element's key should still be 'a'.");
-        assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The single element should have the value 'valueA'.");
-
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
-
-        assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+            assertBoardValuesUnchanged();
+            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
+            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+        }
     }
 
     @Test
@@ -298,6 +241,7 @@ public class BoardServiceImplTest {
                 }
             }
 
+            assertBoardValuesUnchanged();
             assertEquals(expectedContent, fileContent.toString(), "The file content should match the expected format");
         } finally {
             testFile.delete();
@@ -317,15 +261,7 @@ public class BoardServiceImplTest {
         try {
             boardService.load(board, testFile.getName());
 
-            assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The board should load the saved key");
-            assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The board should load the saved value");
-            assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The board should load the saved key");
-            assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The board should load the saved value");
-            assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The board should load the saved key");
-            assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The board should load the saved value");
-            assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The board should load the saved key");
-            assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The board should load the saved value");
-
+            assertBoardValuesUnchanged();
             assertEquals(2, board.getArray().size(), "The board should have 2 rows after loading");
             assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after loading");
         } finally {
@@ -342,15 +278,7 @@ public class BoardServiceImplTest {
 
             boardService.load(board, testFile.getName());
 
-            assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The board should load the saved key");
-            assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The board should load the saved value");
-            assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The board should load the saved key");
-            assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The board should load the saved value");
-            assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The board should load the saved key");
-            assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The board should load the saved value");
-            assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The board should load the saved key");
-            assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The board should load the saved value");
-
+            assertBoardValuesUnchanged();
             assertEquals(2, board.getArray().size(), "The board should have 2 rows after loading");
             assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after loading");
         } finally {
@@ -358,4 +286,14 @@ public class BoardServiceImplTest {
         }
     }
 
+    private void assertBoardValuesUnchanged() {
+        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
+        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
+        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
+        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
+        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
+        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
+        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
+        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
+    }
 }
