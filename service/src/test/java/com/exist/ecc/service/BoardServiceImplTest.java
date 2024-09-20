@@ -2,10 +2,12 @@ import com.exist.ecc.model.Board;
 import com.exist.ecc.model.Cell;
 import com.exist.ecc.util.Utils;
 import com.exist.ecc.service.BoardServiceImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.BufferedReader;
@@ -23,29 +25,82 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
+
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+
+
 public class BoardServiceImplTest {
 
+    @Spy
+    @InjectMocks
     private BoardServiceImpl boardService;
+
+    @Mock
     private Board board;
+
+    @Mock
+    private Cell cell;
+
     private final ByteArrayOutputStream outputStreamCaptor = new ByteArrayOutputStream();
+
+    private final int DEFAULT_NUMBER_OF_ROWS = 2;
+    private final int DEFAULT_NUMBER_OF_COLS = 2;
 
     @BeforeEach
     public void setUp() {
-        boardService = new BoardServiceImpl();
-        board = new Board();
+        MockitoAnnotations.openMocks(this);
         List<List<Cell>> array = new ArrayList<>();
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell("key1", "value1"));
-        row.add(new Cell("key2", "value2"));
-        array.add(row);
+        List<Cell> row;
+        int cellNumber = 0;
 
-        row = new ArrayList<>();
-        row.add(new Cell("key3", "value3"));
-        row.add(new Cell("key4", "value4"));
-        array.add(row);
+        for (int rowNumber = 0; rowNumber < DEFAULT_NUMBER_OF_ROWS; rowNumber++) {
+            row = new ArrayList<>();
+            for (int colNumber = 0; colNumber < DEFAULT_NUMBER_OF_COLS; colNumber++) {
+                cell = mock(Cell.class);
+                cellNumber++;
+                when(cell.getKey()).thenReturn("key" + cellNumber);
+                when(cell.getValue()).thenReturn("value" + cellNumber);
+                when(cell.toString()).thenReturn("key" + cellNumber 
+                    + " value" + cellNumber);
+                row.add(cell);
+            }
+            array.add(row);
+        }
 
-        board.setArray(array);
+        when(board.getArray()).thenReturn(array);
+
+        doAnswer(invocation -> {
+            List<List<Cell>> newArray = invocation.getArgument(0);
+
+            when(board.getArray()).thenReturn(newArray);
+
+            return null;
+
+        }).when(board).setArray(any(List.class));
+
         System.setOut(new PrintStream(outputStreamCaptor));
+    }
+
+    @AfterEach
+    private void assertBoardDoesntContainInvalidValues() {
+        board.getArray().forEach(row -> {
+            row.forEach(cell -> {
+                String cellString = cell.getKey() + cell.getValue();
+                assertTrue(!cellString.contains("[")
+                        && !cellString.contains("]")
+                        && !cellString.contains(" "), 
+                    "Cell should not contain invalid characters.");
+            });
+        });
     }
 
     @Nested
@@ -55,25 +110,42 @@ public class BoardServiceImplTest {
         public void testFound(String stringToSearch) {
             assertTrue(boardService.search(board, stringToSearch));
             assertTrue(outputStreamCaptor.toString().contains("Value found"));
-            assertBoardValuesUnchanged();
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            assertBoardNotSavedOrLoaded();
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {"key5", "x", "key 1", "value5", "value 2"})
+        @ValueSource(strings = {"keyx", "x", "key 1", "b", "value 2"})
         public void testNotFound(String stringToSearch) {
-            assertFalse(boardService.search(board, stringToSearch), "The search should not find the string");
-            assertTrue(outputStreamCaptor.toString().contains("Total occurences: 0"), "Should not print found message.");
-            assertBoardValuesUnchanged();
+            assertFalse(boardService.search(board, stringToSearch), 
+                "The search should not find the string");
+            assertTrue(outputStreamCaptor.toString()
+                .contains("Total occurences: 0"), 
+                "Should not print found message.");
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            assertBoardNotSavedOrLoaded();
         }
     }
 
     @Test
     public void testPrint() {
         boardService.print(board);
-        assertTrue(outputStreamCaptor.toString().contains("[key1 value1] [key2 value2]")
-            && outputStreamCaptor.toString().contains("[key3 value3] [key4 value4]"),
+        int cellNumber = 0;
+        String expectedOutput = "";
+
+        for (int rowNumber = 0; rowNumber < DEFAULT_NUMBER_OF_ROWS; rowNumber++) {
+            for (int colNumber = 0; colNumber < DEFAULT_NUMBER_OF_COLS; colNumber++) {
+                cellNumber++;
+                expectedOutput += String.format("[key%d value%d] ", cellNumber, 
+                    cellNumber);
+            }
+            expectedOutput += System.lineSeparator();
+        }
+
+        assertEquals(expectedOutput.trim(), outputStreamCaptor.toString().trim(),
             "Should print the correct board contents.");
-        assertBoardValuesUnchanged();
+        assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+        assertBoardNotSavedOrLoaded();
     }
 
     @Nested
@@ -82,14 +154,16 @@ public class BoardServiceImplTest {
         @ValueSource(strings = {"key1", "key2", "key3", "key4"})
         public void testKeyFound(String key) {
             assertTrue(boardService.containsKey(board, key));
-            assertBoardValuesUnchanged();
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            assertBoardNotSavedOrLoaded();
         }
 
         @ParameterizedTest
         @ValueSource(strings = {"x", "k", "e", "y", "1", "key"})
         public void testKeyNotFound(String key) {
             assertFalse(boardService.containsKey(board, key));
-            assertBoardValuesUnchanged();
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            assertBoardNotSavedOrLoaded();
         }
     }
 
@@ -97,77 +171,82 @@ public class BoardServiceImplTest {
     class TestEdit {
         @Test
         public void testValidKey() {
-            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey1 newValue1\n".getBytes()));
+            Utils.SCANNER = new Scanner(
+                new ByteArrayInputStream("newKey1 newValue1\n".getBytes())
+            );
             boardService.edit(board, "key1");
 
             Cell editedCell = board.getArray().get(0).get(0);
-            assertEquals("newKey1", editedCell.getKey(), "The key should be updated");
-            assertEquals("newValue1", editedCell.getValue(), "The value should be updated");
-
-            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey4 newValue4\n".getBytes()));
-            boardService.edit(board, "key4");
+            verify(editedCell).setKey("newKey1");
+            verify(editedCell).setValue("newValue1");
 
             editedCell = board.getArray().get(1).get(1);
-            assertEquals("newKey4", editedCell.getKey(), "The key should be updated");
-            assertEquals("newValue4", editedCell.getValue(), "The value should be updated");
+            String cellKey = editedCell.getKey();
+            Utils.SCANNER = new Scanner(
+                new ByteArrayInputStream((cellKey + " newValue4\n").getBytes())
+            );
+            boardService.edit(board, cellKey);
 
-            editedCell = board.getArray().get(1).get(0);
-            assertEquals("key3", editedCell.getKey(), "The key should not be updated");
-            assertEquals("value3", editedCell.getValue(), "The value should not be updated");
+            verify(editedCell).setKey(cellKey);
+            verify(editedCell).setValue("newValue4");
 
-            editedCell = board.getArray().get(0).get(1);
-            assertEquals("key2", editedCell.getKey(), "The key should not be updated");
-            assertEquals("value2", editedCell.getValue(), "The value should not be updated");
-
-            assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
+            assertEquals(DEFAULT_NUMBER_OF_ROWS, board.getArray().size(),
+                "The board should have " + DEFAULT_NUMBER_OF_ROWS 
+                + " rows after editing");
+            assertEquals(DEFAULT_NUMBER_OF_COLS, board.getArray().get(0).size(), 
+                "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+                + " columns after editing");
+            assertBoardNotSavedOrLoaded();
         }
 
         @ParameterizedTest
         @ValueSource(strings = {"x", "k", "e", "y", "1", "key"})
         public void testInvalidKey(String key) {
-            Utils.SCANNER = new Scanner(new ByteArrayInputStream("newKey newValue\n".getBytes()));
+            Utils.SCANNER = new Scanner(
+                new ByteArrayInputStream("newKey newValue\n".getBytes())
+            );
             boardService.edit(board, key);
 
-            assertBoardValuesUnchanged();
-            assertEquals(2, board.getArray().size(), "The board should have 2 rows after editing");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after editing");
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            assertBoardNotSavedOrLoaded();
         }
     }
 
-    @Test
-    public void testReset() {
-        boardService.reset(board, 2, 2);
-        assertEquals(2, board.getArray().size(), "The board should have 2 rows after reset");
-        assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after reset");
-
-        boardService.reset(board, 10, 3);
-        assertEquals(10, board.getArray().size(), "The board should have 10 rows after reset");
-        assertEquals(3, board.getArray().get(0).size(), "Each row should have 3 columns after reset");
-
-        boardService.reset(board, 4, 5);
-        assertEquals(4, board.getArray().size(), "The board should have 4 rows after reset");
-        assertEquals(5, board.getArray().get(0).size(), "Each row should have 5 columns after reset");
-
-        boardService.reset(board, 101, 202);
-        assertEquals(101, board.getArray().size(), "The board should have 101 rows after reset");
-        assertEquals(202, board.getArray().get(0).size(), "Each row should have 202 columns after reset");
+    @ParameterizedTest
+    @CsvSource({
+        "2, 2",
+        "10, 3",
+        "4, 5",
+        "101, 202"
+    })
+    public void testReset(int rows, int cols) {
+        boardService.reset(board, rows, cols);
+        
+        assertEquals(rows, board.getArray().size(), 
+            "The board should have " + rows + " rows after reset");
+        assertEquals(cols, board.getArray().get(0).size(), 
+            "Each row should have " + cols + " columns after reset");
+        verify(board).setArray(any(List.class));
+        assertBoardNotSavedOrLoaded();
     }
 
     @Test
     public void testAddRow() {
-        boardService.addRow(board);
-        assertEquals(3, board.getArray().size(), "The board should have 3 rows after adding a row");
-
-        boardService.addRow(board);
-        assertEquals(4, board.getArray().size(), "The board should have 4 rows after adding a row");
-
-        boardService.addRow(board);
-        assertEquals(5, board.getArray().size(), "The board should have 5 rows after adding a row");
+        int addedRows;
+        for (addedRows = 0; addedRows < 5; addedRows++) {
+            boardService.addRow(board);
+            assertEquals(DEFAULT_NUMBER_OF_ROWS + addedRows + 1, 
+                board.getArray().size(), "The board should have " 
+                + (DEFAULT_NUMBER_OF_ROWS + addedRows + 1) 
+                + " rows after adding a row");
+        }
 
         assertBoardValuesUnchanged();
-        assertEquals(5, board.getArray().size(), "The board should have 5 rows after adding");
-        assertEquals(2, board.getArray().get(4).size(), "Each row should have 3 columns after adding");
+        assertBoardNotSavedOrLoaded();
+        assertEquals(DEFAULT_NUMBER_OF_COLS, board.getArray()
+            .get(addedRows + DEFAULT_NUMBER_OF_ROWS - 1).size(), 
+            "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+            + " columns after adding");
     }
 
     @Nested
@@ -179,15 +258,28 @@ public class BoardServiceImplTest {
             row.add(new Cell("a", "valueA"));
             board.getArray().add(row);
 
-            boardService.sortRow(board, 2);
-            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
-            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
-            assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
-            assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
+            boardService.sortRow(board, DEFAULT_NUMBER_OF_ROWS);
+            assertEquals("a", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getKey(), 
+                "The row should be sorted by key and value");
+            assertEquals("valueA", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getValue(), 
+                "The row should be sorted by key and value");
+            assertEquals("b", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(1).getKey(), 
+                "The row should be sorted by key and value");
+            assertEquals("valueB", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(1).getValue(), 
+                "The row should be sorted by key and value");
             
             assertBoardValuesUnchanged();
-            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+            assertBoardNotSavedOrLoaded();
+            assertEquals(DEFAULT_NUMBER_OF_ROWS + 1, board.getArray().size(), 
+                "The board should have " + DEFAULT_NUMBER_OF_ROWS 
+                + " rows after sorting");
+            assertEquals(DEFAULT_NUMBER_OF_COLS, board.getArray().get(0).size(), 
+                "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+                + " columns after sorting");
         }
 
         @Test
@@ -197,15 +289,30 @@ public class BoardServiceImplTest {
             row.add(new Cell("b", "valueB"));
             board.getArray().add(row);
 
-            boardService.sortRow(board, 0);
-            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The row should be sorted by key and value");
-            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The row should be sorted by key and value");
-            assertEquals("b", board.getArray().get(2).get(1).getKey(), "The row should be sorted by key and value");
-            assertEquals("valueB", board.getArray().get(2).get(1).getValue(), "The row should be sorted by key and value");
+            boardService.sortRow(board, DEFAULT_NUMBER_OF_ROWS);
+            assertEquals("a", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getKey(), 
+                "The row should be sorted by key and value");
+            assertEquals("valueA", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getValue(), 
+                "The row should be sorted by key and value");
+            assertEquals("b", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(1).getKey(), 
+                "The row should be sorted by key and value");
+            assertEquals("valueB", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(1).getValue(), 
+                "The row should be sorted by key and value");
 
             assertBoardValuesUnchanged();
-            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+            assertBoardNotSavedOrLoaded();
+            assertEquals(DEFAULT_NUMBER_OF_ROWS + 1, 
+                board.getArray().size(), 
+                "The board should have " 
+                + (DEFAULT_NUMBER_OF_ROWS + 1) + " rows after sorting");
+            assertEquals(DEFAULT_NUMBER_OF_COLS, 
+                board.getArray().get(0).size(), 
+                "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+                + " columns after sorting");
         }
 
         @Test
@@ -214,13 +321,22 @@ public class BoardServiceImplTest {
             row.add(new Cell("a", "valueA"));
             board.getArray().add(row);
 
-            boardService.sortRow(board, 2);
-            assertEquals("a", board.getArray().get(2).get(0).getKey(), "The single element's key should still be 'a'.");
-            assertEquals("valueA", board.getArray().get(2).get(0).getValue(), "The single element should have the value 'valueA'.");
+            boardService.sortRow(board, DEFAULT_NUMBER_OF_ROWS);
+            assertEquals("a", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getKey(), 
+                "The single element's key should still be 'a'.");
+            assertEquals("valueA", 
+                board.getArray().get(DEFAULT_NUMBER_OF_ROWS).get(0).getValue(), 
+                "The single element should have the value 'valueA'.");
 
             assertBoardValuesUnchanged();
-            assertEquals(3, board.getArray().size(), "The board should have 3 rows after sorting");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after sorting");
+            assertBoardNotSavedOrLoaded();
+            assertEquals(DEFAULT_NUMBER_OF_ROWS + 1, board.getArray().size(), 
+                "The board should have " + DEFAULT_NUMBER_OF_ROWS 
+                + " rows after sorting");
+            assertEquals(DEFAULT_NUMBER_OF_COLS, board.getArray().get(0).size(), 
+                "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+                + " columns after sorting");
         }
     }
 
@@ -231,18 +347,37 @@ public class BoardServiceImplTest {
             boardService.save(board, testFile.getName());
             assertTrue(testFile.exists(), "The save file should be created");
 
-            String expectedContent = "key1 value1[]key2 value2\nkey3 value3[]key4 value4\n";
+            String expectedContent = "";
+            int cellNumber = 0;
+            boolean firstCellPrinted = false;
+
+            for (int rowNumber = 0; rowNumber < DEFAULT_NUMBER_OF_ROWS; rowNumber++) {
+                firstCellPrinted = false;
+                for (int colNumber = 0; colNumber < DEFAULT_NUMBER_OF_COLS; colNumber++) {
+                    cellNumber++;
+                    if (!firstCellPrinted) {
+                        expectedContent += "key" + cellNumber + " value" + cellNumber;
+                        firstCellPrinted = true;
+                    } else {
+                        expectedContent += "[]" + "key" + cellNumber + " value" + cellNumber;
+                    }
+                }
+                expectedContent += "\n";
+            }
+
             StringBuilder fileContent = new StringBuilder();
 
             try (BufferedReader reader = new BufferedReader(new FileReader(testFile))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    fileContent.append(line).append("\n"); // Include new line character
+                    fileContent.append(line).append("\n");
                 }
             }
 
-            assertBoardValuesUnchanged();
-            assertEquals(expectedContent, fileContent.toString(), "The file content should match the expected format");
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            verify(boardService, never()).load(any(Object.class), any(String.class));
+            assertEquals(expectedContent.trim(), fileContent.toString().trim(), 
+                "The file content should match the expected format");
         } finally {
             testFile.delete();
         }
@@ -254,16 +389,22 @@ public class BoardServiceImplTest {
         File testFile = new File("pre_existing_board.txt");
 
         try (FileWriter writer = new FileWriter(testFile)) {
-            writer.write("key1 value1[]key2 value2\n");
-            writer.write("key3 value3[]key4 value4\n");
+            int cellNumber = 0;
+
+            for (int rowNumber = 0; rowNumber < DEFAULT_NUMBER_OF_ROWS; rowNumber++) {
+                for (int colNumber = 0; colNumber < DEFAULT_NUMBER_OF_COLS; colNumber++) {
+                    cellNumber++;
+                    writer.write("key" + cellNumber + " value" + cellNumber + "[]");
+                }
+                writer.write("\n");
+            }
         }
 
         try {
             boardService.load(board, testFile.getName());
 
-            assertBoardValuesUnchanged();
-            assertEquals(2, board.getArray().size(), "The board should have 2 rows after loading");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after loading");
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
+            verify(boardService, never()).save(any(Object.class), any(String.class));
         } finally {
             testFile.delete();
         }
@@ -278,22 +419,37 @@ public class BoardServiceImplTest {
 
             boardService.load(board, testFile.getName());
 
-            assertBoardValuesUnchanged();
-            assertEquals(2, board.getArray().size(), "The board should have 2 rows after loading");
-            assertEquals(2, board.getArray().get(0).size(), "Each row should have 2 columns after loading");
+            assertBoardValuesUnchangedWithDefaultRowsAndColumns();
         } finally {
             testFile.delete();
         }
     }
 
+    private void assertBoardNotSavedOrLoaded() {
+        verify(boardService, never()).save(any(Object.class), any(String.class));
+        verify(boardService, never()).load(any(Object.class), any(String.class));
+    }
+
     private void assertBoardValuesUnchanged() {
-        assertEquals("key1", board.getArray().get(0).get(0).getKey(), "The key should not change");
-        assertEquals("value1", board.getArray().get(0).get(0).getValue(), "The value should not change");
-        assertEquals("key2", board.getArray().get(0).get(1).getKey(), "The key should not change");
-        assertEquals("value2", board.getArray().get(0).get(1).getValue(), "The value should not change");
-        assertEquals("key3", board.getArray().get(1).get(0).getKey(), "The key should not change");
-        assertEquals("value3", board.getArray().get(1).get(0).getValue(), "The value should not change");
-        assertEquals("key4", board.getArray().get(1).get(1).getKey(), "The key should not change");
-        assertEquals("value4", board.getArray().get(1).get(1).getValue(), "The value should not change");
+        int cellNumber = 0;
+
+        for (int rowNumber = 0; rowNumber < DEFAULT_NUMBER_OF_ROWS; rowNumber++) {
+            for (int colNumber = 0; colNumber < DEFAULT_NUMBER_OF_COLS; colNumber++) {
+                cellNumber++;
+                Cell cell = board.getArray().get(rowNumber).get(colNumber);
+                assertEquals("key" + cellNumber + " value" + cellNumber, 
+                    cell.toString(), "The key and value should not change");
+            }
+        }
+    }
+
+    private void assertBoardValuesUnchangedWithDefaultRowsAndColumns() {
+        assertBoardValuesUnchanged();
+        assertEquals(DEFAULT_NUMBER_OF_ROWS, board.getArray().size(), 
+            "The board should have " + DEFAULT_NUMBER_OF_ROWS 
+            + " rows after the operation");
+        assertEquals(DEFAULT_NUMBER_OF_COLS, board.getArray().get(0).size(), 
+            "Each row should have " + DEFAULT_NUMBER_OF_COLS 
+            + " columns after the operation");
     }
 }
